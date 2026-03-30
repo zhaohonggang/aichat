@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Gemini 免费模型聊天</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --border: #475569;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: var(--surface);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .model-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .model-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .model-card:hover {
+            background: var(--surface-hover);
+            border-color: var(--primary);
+        }
+
+        .model-card.selected {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .model-card h3 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .model-card p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .model-card .rate-limit {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+            font-size: 0.7rem;
+            color: #fbbf24;
+        }
+
+        .model-card .rate-limit span {
+            background: rgba(251, 191, 36, 0.15);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+        }
+
+        .model-card.selected p,
+        .model-card.selected .rate-limit {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .model-card.selected .rate-limit span {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 1rem;
+            border-radius: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--primary);
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .message.error {
+            align-self: flex-start;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: var(--surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .chat-input input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .chat-input input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .chat-input button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .chat-input button:hover:not(:disabled) {
+            background: var(--primary-hover);
+        }
+
+        .chat-input button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .no-model-selected {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            text-align: center;
+            gap: 1rem;
+        }
+
+        .config-warning {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 0.25rem;
+            padding: 0.5rem;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            main { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 200px; }
+            .message { max-width: 95%; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🤖 Google Gemini 免费模型聊天</h1>
+        <div class="status">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">未连接</span>
+        </div>
+    </header>
+
+    <main>
+        <aside class="sidebar">
+            <h2>选择模型</h2>
+            <div class="model-list" id="modelList"></div>
+        </aside>
+
+        <div class="chat-container">
+            <div id="configWarning" class="config-warning" style="display: none;">
+                ⚠️ 请先配置 API Key：在项目根目录创建 .env 文件，设置 OPENCODE_API_KEY
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="no-model-selected" id="noModelSelected">
+                    <p>👈 请选择一个模型开始聊天</p>
+                </div>
+            </div>
+
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="输入消息..." disabled>
+                <button id="sendButton" disabled>发送</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let selectedModel = null;
+        let chatHistory = [];
+        let isLoading = false;
+
+        const modelList = document.getElementById('modelList');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const noModelSelected = document.getElementById('noModelSelected');
+        const configWarning = document.getElementById('configWarning');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                const data = await response.json();
+                
+                modelList.innerHTML = '';
+                data.models.forEach(model => {
+                    const card = document.createElement('div');
+                    card.className = 'model-card';
+                    card.dataset.modelId = model.id;
+                    const rateLimitInfo = model.rpm ? `
+                        <div class="rate-limit">
+                            <span>${model.rpm} RPM</span>
+                            <span>${model.rpd} RPD</span>
+                        </div>
+                    ` : '';
+                    card.innerHTML = `
+                        <h3>${model.name}</h3>
+                        <p>${model.description}</p>
+                        ${rateLimitInfo}
+                    `;
+                    card.addEventListener('click', () => selectModel(model.id, card));
+                    modelList.appendChild(card);
+                });
+
+                if (data.api_key_configured) {
+                    statusDot.classList.add('connected');
+                    statusText.textContent = '已连接';
+                } else {
+                    configWarning.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to load models:', error);
+            }
+        }
+
+        function selectModel(modelId, card) {
+            document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedModel = modelId;
+            chatHistory = [];
+            
+            noModelSelected.style.display = 'none';
+            chatMessages.innerHTML = '';
+            
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+
+        function addMessage(content, role, isError = false) {
+            if (noModelSelected.style.display !== 'none') {
+                noModelSelected.style.display = 'none';
+            }
+            
+            const message = document.createElement('div');
+            message.className = `message ${role}${isError ? ' error' : ''}`;
+            message.textContent = content;
+            chatMessages.appendChild(message);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.id = 'typingIndicator';
+            indicator.innerHTML = '<span></span><span></span><span></span';
+            chatMessages.appendChild(indicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        async function sendMessage() {
+            if (!selectedModel || isLoading) return;
+            
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            messageInput.value = '';
+            addMessage(message, 'user');
+            isLoading = true;
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+            showTypingIndicator();
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: selectedModel,
+                        message: message,
+                        history: chatHistory
+                    })
+                });
+
+                const data = await response.json();
+                removeTypingIndicator();
+
+                if (data.error) {
+                    addMessage(data.error, 'assistant', true);
+                } else {
+                    addMessage(data.response, 'assistant');
+                    chatHistory.push({ role: 'user', content: message });
+                    chatHistory.push({ role: 'assistant', content: data.response });
+                }
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage('请求失败: ' + error.message, 'assistant', true);
+            } finally {
+                isLoading = false;
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        loadModels();
+    </script>
+</body>
+</html>
