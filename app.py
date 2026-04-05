@@ -1,98 +1,40 @@
 import os
+import json
 import requests
 from flask import Flask, render_template, request, jsonify
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-
-load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-GOOGLE_API_KEY = "AIzaSyAaq5l8Jjt-LluMow96oe5jwovplix37uU"
+CONFIG_DIR = os.path.join(os.path.dirname(__file__), "config")
+
+with open(os.path.join(CONFIG_DIR, "settings.json"), "r") as f:
+    settings = json.load(f)
+
+GOOGLE_API_KEY = settings["google_api_key"]
 GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+EXTERNAL_API_URL = settings["external_api_url"]
 
-MODELS = [
-    {
-        "id": "gemini-2.5-flash",
-        "name": "Gemini 2.5 Flash",
-        "provider": "google",
-        "rpm": 10,
-        "rpd": 250,
-    },
-    {
-        "id": "gemini-flash-latest",
-        "name": "Gemini Flash Latest",
-        "provider": "google",
-        "rpm": 10,
-        "rpd": 250,
-    },
-    {
-        "id": "gemini-2.0-flash",
-        "name": "Gemini 2.0 Flash",
-        "provider": "google",
-        "rpm": 10,
-        "rpd": 250,
-    },
-    {
-        "id": "gemini-2.0-flash-lite",
-        "name": "Gemini 2.0 Flash-Lite",
-        "provider": "google",
-        "rpm": 15,
-        "rpd": 1000,
-    },
-    {
-        "id": "gemini-pro-latest",
-        "name": "Gemini Pro Latest",
-        "provider": "google",
-        "rpm": 5,
-        "rpd": 100,
-    },
-    {
-        "id": "gemini-2.5-pro",
-        "name": "Gemini 2.5 Pro",
-        "provider": "google",
-        "rpm": 5,
-        "rpd": 100,
-    },
-    {
-        "id": "gemma-3-1b-it",
-        "name": "Gemma 3 1B",
-        "provider": "google",
-        "rpm": 30,
-        "rpd": 14400,
-    },
-    {
-        "id": "gemma-3-4b-it",
-        "name": "Gemma 3 4B",
-        "provider": "google",
-        "rpm": 30,
-        "rpd": 14400,
-    },
-    {
-        "id": "gemma-3-12b-it",
-        "name": "Gemma 3 12B",
-        "provider": "google",
-        "rpm": 30,
-        "rpd": 14400,
-    },
-    {
-        "id": "gemma-3-27b-it",
-        "name": "Gemma 3 27B",
-        "provider": "google",
-        "rpm": 30,
-        "rpd": 14400,
-    },
-    {
-        "id": "Home-0.0.1",
-        "name": "Home 0.0.1",
-        "provider": "external",
-        "rpm": 999999,
-        "rpd": 999999,
-    },
-]
 
-EXTERNAL_API_URL = "http://localhost:5010"
+def load_models():
+    models = []
+
+    google_models_path = os.path.join(CONFIG_DIR, "google_models.json")
+    with open(google_models_path, "r") as f:
+        for m in json.load(f):
+            m["provider"] = "google"
+            models.append(m)
+
+    home_models_path = os.path.join(CONFIG_DIR, "home_models.json")
+    with open(home_models_path, "r") as f:
+        for m in json.load(f):
+            m["provider"] = "external"
+            models.append(m)
+
+    return models
+
+
+MODELS = load_models()
 
 
 def call_google_gemini(model_id: str, message: str, history: list = None):
